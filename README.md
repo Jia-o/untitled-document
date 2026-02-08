@@ -16,4 +16,9 @@ My code calls 3 APIs. The first one https://bored-api.appbrewery.com/random, get
 - now on the "The excuse" paper can there be a button next to the close button that is called "get a random fact instead" that displays a call to https://uselessfacts.jsph.pl/api/v2/facts/random 
 - combine these files 
 
+## Run the Project
+- On terminal 1 run: python app.py
+- On terminal 2 run: python -m http.server 8000
+- Copy into browser: http://127.0.0.1:8000/index.html
+
 ## Video Link
