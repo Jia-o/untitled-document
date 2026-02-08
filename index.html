@@ -4,10 +4,23 @@
   <meta charset="UTF-8" />
   <title>Magic Jar</title>
   <style>
+    /* Background Canvas Styling */
+    #bgCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1; /* Keeps it behind the jar */
+      display: block;
+      background: #02030a;
+    }
+
     body {
       margin: 0;
       height: 100vh;
-      background: radial-gradient(circle at top, #1e1b4b, #020617);
+      /* Adjusted gradient to be slightly transparent to see the stars */
+      background: radial-gradient(circle at top, rgba(62, 36, 101, 0.8), rgba(2, 6, 23, 0.9));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -16,7 +29,7 @@
       overflow: hidden;
     }
 
-    .scene { text-align: center; }
+    .scene { position: relative; text-align: center; z-index: 10; }
 
     .jar-wrapper {
       position: relative;
@@ -164,23 +177,15 @@
       color: #64748b;
       font-size: 11px;
       cursor: pointer;
-      pointer-events: auto; /* Important: Paper has pointer-events: none */
+      pointer-events: auto;
       transition: all 0.2s;
     }
-    .excuse-btn:hover {
-      background: #e2e8f0;
-      color: #0f172a;
-    }
-    .excuse-text {
-      font-style: italic;
-      font-size: 13px;
-      color: #6366f1;
-      margin-top: 8px;
-      display: block;
-    }
+    .excuse-btn:hover { background: #e2e8f0; color: #0f172a; }
   </style>
 </head>
 <body>
+  <canvas id="bgCanvas"></canvas>
+
   <div class="scene">
     <div class="jar-wrapper" id="jarWrapper">
       <div class="lid" id="lid"></div>
@@ -188,21 +193,96 @@
       <div class="jar" id="jarBody"></div>
       <div class="paper" id="paper"><span></span></div>
     </div>
+    <button id="actionBtn" onclick="handleAction()">Goodbye boredom</button>
+  </div>
 
-    <button id="actionBtn" onclick="handleAction()">Shake the magic jar</button>
+  <div id="excuseModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(37, 15, 58, 0.8); z-index: 100; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 25px; border-radius: 20px; max-width: 350px; width: 90%; text-align: center; color: #1e293b; box-shadow: 0 0 30px rgba(0,0,0,0.5);">
+      <h3 id="modalTitle" style="margin-top: 0; color: #6366f1;">Here, use this excuse:</h3>
+      <p id="modalExcuseText" style="font-style: italic; line-height: 1.4; min-height: 60px; display: flex; align-items: center; justify-content: center;"></p>
+      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+          <button id="factBtn" onclick="getRandomFact()" style="background: #ec4899; padding: 8px 12px; font-size: 12px;">Get a random fact instead</button>
+          <button onclick="closeModal()" style="background: #94a3b8; padding: 8px 12px; font-size: 12px;">Close</button>
+      </div>
+    </div>
   </div>
 
   <script>
+    /* ---------- BACKGROUND ANIMATION CODE ---------- */
+    const canvas = document.getElementById("bgCanvas");
+    const ctx = canvas.getContext("2d");
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    const bgStars = Array.from({ length: 200 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.2 + 0.3,
+      alpha: Math.random(),
+      twinkle: Math.random() * 0.02 + 0.005
+    }));
+
+    const fireflies = Array.from({ length: 25 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      glow: Math.random() * Math.PI * 2
+    }));
+
+    function drawBgStars() {
+      for (const s of bgStars) {
+        s.alpha += s.twinkle * (Math.random() > 0.5 ? 1 : -1);
+        s.alpha = Math.max(0.2, Math.min(1, s.alpha));
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255,255,255,${s.alpha})`;
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawFireflies() {
+      for (const f of fireflies) {
+        f.x += f.vx;
+        f.y += f.vy;
+        f.glow += 0.05;
+        if (f.x < 0 || f.x > canvas.width) f.vx *= -1;
+        if (f.y < 0 || f.y > canvas.height) f.vy *= -1;
+        const pulse = (Math.sin(f.glow) + 1) / 2;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(180,255,120,${0.3 + pulse * 0.7})`;
+        ctx.shadowColor = "rgba(180,255,120,0.8)";
+        ctx.shadowBlur = 12;
+        ctx.arc(f.x, f.y, 2 + pulse * 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBgStars();
+      drawFireflies();
+      requestAnimationFrame(animate);
+    }
+    animate();
+
+    /* ---------- MAGIC JAR LOGIC ---------- */
     const jar = document.getElementById("jarWrapper");
     const lid = document.getElementById("lid");
     const paper = document.getElementById("paper");
     const button = document.getElementById("actionBtn");
     const content = paper.querySelector('span');
+    const jarBody = document.getElementById("jarBody");
 
     let state = "idle";
 
-    // Create stars inside the jar
-    const jarBody = document.getElementById("jarBody");
+    // Create mini-stars inside the jar
     for (let i = 0; i < 24; i++) {
       const star = document.createElement("div");
       star.className = "star";
@@ -217,115 +297,36 @@
       if (state === "idle") {
         state = "animating";
         button.disabled = true;
-        button.textContent = "Summoning...";
+        button.textContent = "Summoning activity...";
 
         try {
-          // Use the exact URL that worked in your browser bar
           const response = await fetch('http://127.0.0.1:5000/get-magic');
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           const data = await response.json();
 
-          // Fill the paper with the Python data
           content.innerHTML = `
             <div style="font-size: 40px; margin-bottom: 8px;">${data.emoji}</div>
             <div style="font-size: 15px; color: #334155; line-height: 1.2; font-weight: 600;">
               ${data.text}
             </div>
-            <button class="excuse-btn" id="excuseBtn" onclick="giveExcuse(event)">I can't do that...</button>
+            <button class="excuse-btn" onclick="giveExcuse(event)">I don't want to do that...</button>
           `;
-
           runAnimations();
-
         } catch (error) {
           console.error("FETCH ERROR:", error);
-          // button.textContent = "Check Console (F12)";
           button.disabled = false;
           state = "idle";
+          button.textContent = "Goodbye boredom";
         }
       } else if (state === "revealed") {
         resetJar();
       }
     }
 
-    async function giveExcuse(event) {
-      event.stopPropagation();
-      
-      const btn = event.target;
-      const modal = document.getElementById('excuseModal');
-      const modalText = document.getElementById('modalExcuseText');
-      
-      btn.textContent = "Thinking...";
-      btn.disabled = true;
-
-      try {
-        const response = await fetch('http://127.0.0.1:5000/get-excuse');
-        const data = await response.json();
-        
-        // Fill and show the modal
-        modalText.textContent = data.excuse;
-        modal.style.display = 'flex';
-        
-        // Reset button for next time
-        btn.textContent = "I can't do that...";
-        btn.disabled = false;
-      } catch (error) {
-        modalText.textContent = "My pet dragon ate my internet connection.";
-        modal.style.display = 'flex';
-        btn.disabled = false;
-      }
-      // Add these two lines inside your existing giveExcuse function
-      document.getElementById('modalTitle').textContent = "The Excuse";
-      document.getElementById('modalTitle').style.color = "#6366f1";
-      document.getElementById('factBtn').textContent = "Get a random fact instead";
-    }
-
-    function closeModal() {
-      document.getElementById('excuseModal').style.display = 'none';
-    }
-   
-    async function getRandomFact() {
-      const modalText = document.getElementById('modalExcuseText');
-      const modalTitle = document.getElementById('modalTitle');
-      const factBtn = document.getElementById('factBtn');
-
-      factBtn.textContent = "Loading...";
-      factBtn.disabled = true;
-
-      try {
-        const response = await fetch('https://uselessfacts.jsph.pl/api/v2/facts/random');
-        const data = await response.json();
-        
-        // Update the modal content
-        modalTitle.textContent = "Random Fact";
-        modalTitle.style.color = "#ec4899"; // Change color to match the pink button
-        modalText.textContent = data.text;
-        
-        factBtn.textContent = "Get another fact";
-        factBtn.disabled = false;
-      } catch (error) {
-        modalText.textContent = "Fun fact: My fact-checker is on strike.";
-        factBtn.disabled = false;
-      }
-    }
-
-    // Update your existing closeModal to reset the title
-    function closeModal() {
-      document.getElementById('excuseModal').style.display = 'none';
-      // Reset title for the next time an excuse is generated
-      document.getElementById('modalTitle').textContent = "The Excuse";
-      document.getElementById('modalTitle').style.color = "#6366f1";
-    }
-
     function runAnimations() {
       jar.classList.add("shake");
-      
       setTimeout(() => lid.classList.add("open"), 800);
       setTimeout(() => paper.classList.add("fly"), 1200);
-
       setTimeout(() => {
         jar.classList.remove("shake");
         button.textContent = "Reset jar";
@@ -337,20 +338,58 @@
     function resetJar() {
       lid.classList.remove("open");
       paper.classList.remove("fly");
-      button.textContent = "Shake the magic jar";
+      button.textContent = "Goodbye boredom";
       state = "idle";
     }
+
+    async function giveExcuse(event) {
+      event.stopPropagation();
+      const btn = event.target;
+      const modal = document.getElementById('excuseModal');
+      const modalText = document.getElementById('modalExcuseText');
+      btn.textContent = "Thinking...";
+      btn.disabled = true;
+
+      try {
+        const response = await fetch('http://127.0.0.1:5000/get-excuse');
+        const data = await response.json();
+        modalText.textContent = data.excuse;
+        modal.style.display = 'flex';
+        btn.textContent = "I don't want to do that...";
+        btn.disabled = false;
+      } catch (error) {
+        modalText.textContent = "My pet dragon ate my internet connection.";
+        modal.style.display = 'flex';
+        btn.disabled = false;
+      }
+    }
+
+    async function getRandomFact() {
+      const modalText = document.getElementById('modalExcuseText');
+      const modalTitle = document.getElementById('modalTitle');
+      const factBtn = document.getElementById('factBtn');
+      factBtn.textContent = "Loading...";
+      factBtn.disabled = true;
+
+      try {
+        const response = await fetch('https://uselessfacts.jsph.pl/api/v2/facts/random');
+        const data = await response.json();
+        modalTitle.textContent = "Random Fact";
+        modalTitle.style.color = "#ec4899";
+        modalText.textContent = data.text;
+        factBtn.textContent = "Get another fact";
+        factBtn.disabled = false;
+      } catch (error) {
+        modalText.textContent = "Fun fact: My fact-checker is on strike.";
+        factBtn.disabled = false;
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('excuseModal').style.display = 'none';
+      document.getElementById('modalTitle').textContent = "The Excuse";
+      document.getElementById('modalTitle').style.color = "#6366f1";
+    }
   </script>
-  <div id="excuseModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; align-items: center; justify-content: center;">
-    <div style="background: white; padding: 25px; border-radius: 20px; max-width: 350px; width: 90%; text-align: center; color: #1e293b; box-shadow: 0 0 30px rgba(0,0,0,0.5);">
-      <h3 id="modalTitle" style="margin-top: 0; color: #6366f1;">The Excuse</h3>
-      <p id="modalExcuseText" style="font-style: italic; line-height: 1.4; min-height: 60px; display: flex; align-items: center; justify-content: center;"></p>
-      
-      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-          <button id="factBtn" onclick="getRandomFact()" style="background: #ec4899; padding: 8px 12px; font-size: 12px;">Get a random fact instead</button>
-          <button onclick="closeModal()" style="background: #94a3b8; padding: 8px 12px; font-size: 12px;">Close</button>
-      </div>
-    </div>
-  </div>
 </body>
 </html>
